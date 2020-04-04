@@ -58,11 +58,9 @@ stock CalculateTime(Minutes){
 	new pReturn[32];
 	new hours, minutes = Minutes
 	
-	while (minutes >= 60){
-		hours++;
-		minutes -= 60;
-	}
-	
+	hours = minutes / 60;
+	minutes = minutes - (hours * 60);
+
 	if (hours) formatex(pReturn, charsmax(pReturn), "%d hour%s & %d minute%s", hours, hours == 1 ? "" : "s", minutes, minutes == 1 ? "" : "s");
 	else formatex(pReturn, charsmax(pReturn), "%d minute%s", minutes, minutes == 1 ? "" : "s");
 	hours = minutes = 0;
