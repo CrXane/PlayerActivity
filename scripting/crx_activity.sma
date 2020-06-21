@@ -3,12 +3,21 @@
 #include <nvault>
 
 new vault_name[] = "activity";
-new player_time[33];
+
+enum _:PlayerData{
+	steamid[32],
+	total_playtime[16],
+	iTotal_playtime,
+	timestamp,
+	bool:is_player,
+}
+
+new Player[33][PlayerData];
 
 public plugin_init(){
 	register_plugin("Player Activity", "1.0", "Relaxing");
 
-	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A);
+	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A, " - shows current players' activity, [steamid] for single search");
 	register_clcmd("say /activity", "clcmd_activity");
 }
 
@@ -17,15 +26,17 @@ public plugin_natives(){
 }
 
 public client_putinserver(id){
-	if (!is_user_bot(id) && !is_user_hltv(id)){
+	Player[id][is_player] = bool: (!is_user_bot(id) && !is_user_hltv(id));
+	
+	if (Player[id][is_player]){
+		get_user_authid(id, Player[id][steamid], charsmax(Player[][steamid]));
 		LoadTime(id);
 	}
 }
 
 public client_disconnected(id){
-	if (!is_user_bot(id) && !is_user_hltv(id)){
+	if (Player[id][is_player]){
 		SaveTime(id);
-		player_time[id] = 0;
 	}
 }
 
@@ -33,24 +44,40 @@ public clcmd_admin_activity(id, level, cid){
 	if (!cmd_access(id, level, cid, 0))
 		return PLUGIN_HANDLED;
 		
-	new players[32], num, pid, name[32], x;
-	get_players(players, num, "ch");
+	new args[32];
+	read_args(args, charsmax(args));
+	remove_quotes(args); trim(args);
+	
+	if (strlen(args)){
+		new vault = nvault_open(vault_name);
+		new vault_data[10], _time[24], temp;
 		
-	if (players[0]){
-		console_print(id, "All Time activity");
-		for (new i = 0; i < num; i++){
-			pid = players[i]; x++;
+		if (nvault_lookup(vault, args, vault_data, charsmax(vault_data), temp)){
+			format_time(_time, charsmax(_time), "%m/%d/%Y %H:%M:%S", temp);
+			console_print(id, "%s    %s", args, CalculateTime(str_to_num(vault_data)));
+			console_print(id, "Last online %s", _time)
+		} else console_print(id, "No data matching ^"%s^"", args);
+	} else {	
+		new players[32], num, pid, name[32], x;
+		get_players(players, num, "ch");
 			
-			get_user_name(pid, name, charsmax(name));
-			console_print(id, "%d) %s    %s", x, name, CalculateTime(player_time[pid]));
-		}
-	} else console_print(id, "No valid players online");
+		if (players[0]){
+			console_print(id, "All Time activity");
+			for (new i = 0; i < num; i++){
+				pid = players[i]; x++;
+				
+				get_user_name(pid, name, charsmax(name));
+				console_print(id, "%d) %s    %s", x, name, CalculateTime(Player[pid][iTotal_playtime]));
+			}
+		} else console_print(id, "No valid players online");
+	}
+	
 	return PLUGIN_HANDLED;
 }
 
 public clcmd_activity(id){
 	client_print(id, print_chat, "Current activity: %s", CalculateTime(get_user_time(id)/60));
-	client_print(id, print_chat, "All Time activity: %s", CalculateTime(player_time[id]));
+	client_print(id, print_chat, "All Time activity: %s", CalculateTime(Player[id][iTotal_playtime]));
 	return PLUGIN_HANDLED;
 }
 
@@ -63,40 +90,29 @@ stock CalculateTime(Minutes){
 
 	if (hours) formatex(pReturn, charsmax(pReturn), "%d hour%s & %d minute%s", hours, hours == 1 ? "" : "s", minutes, minutes == 1 ? "" : "s");
 	else formatex(pReturn, charsmax(pReturn), "%d minute%s", minutes, minutes == 1 ? "" : "s");
-	hours = minutes = 0;
+	
 	return pReturn;
 }
 
 stock LoadTime(id){
-	new authid[20], vault_data[10], temp;
 	new vault = nvault_open(vault_name);
-	get_user_authid(id, authid, charsmax(authid));
 	
-	if (nvault_lookup(vault, authid, vault_data, charsmax(vault_data), temp)){
-		nvault_get(vault, authid, vault_data, charsmax(vault_data));
-		player_time[id] = str_to_num(vault_data);
-	}
+	if (nvault_lookup(vault, Player[id][steamid], Player[id][total_playtime], charsmax(Player[][total_playtime]), Player[id][timestamp]))
+		Player[id][iTotal_playtime] = str_to_num(Player[id][total_playtime]);
 	else {
-		player_time[id] = 0;
-		num_to_str(player_time[id], vault_data, charsmax(vault_data));
-		nvault_set(vault, authid, vault_data);
+		Player[id][total_playtime] = "0";
+		Player[id][timestamp] = get_systime();
+		nvault_set(vault, Player[id][steamid], Player[id][total_playtime]);
 	}
 	nvault_close(vault);
 }
 	
 stock SaveTime(id){
-	new data, authid[20], vault_data[10];
-	new current_time = get_user_time(id)/60;
 	new vault = nvault_open(vault_name);
-	get_user_authid(id, authid, charsmax(authid));
-	nvault_get(vault, authid, vault_data, charsmax(vault_data));
-	data = str_to_num(vault_data);
-	data += current_time;
-	
-	num_to_str(data, vault_data, charsmax(vault_data));
-	nvault_set(vault, authid, vault_data);
+	formatex(Player[id][total_playtime], charsmax(Player[][total_playtime]), "%d", Player[id][iTotal_playtime] + get_user_time(id)/60);
+	nvault_set(vault, Player[id][steamid], Player[id][total_playtime]);
 	nvault_close(vault);
 }
 
 public _get_user_time(id)
-	return is_user_connected(id) ? player_time[id] : 0;
+	return is_user_connected(id) ? Player[id][iTotal_playtime] : 0;
