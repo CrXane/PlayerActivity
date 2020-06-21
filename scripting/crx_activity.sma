@@ -15,7 +15,7 @@ enum _:PlayerData{
 new Player[33][PlayerData];
 
 public plugin_init(){
-	register_plugin("Player Activity", "1.0", "Relaxing");
+	register_plugin("Player Activity", "1.1", "Relaxing");
 
 	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A, " - shows current players' activity, [steamid] for single search");
 	register_clcmd("say /activity", "clcmd_activity");
@@ -116,3 +116,6 @@ stock SaveTime(id){
 
 public _get_user_time(id)
 	return is_user_connected(id) ? Player[id][iTotal_playtime] : 0;
+
+public _get_user_time_timestamp(id)
+	return is_user_connected(id) ? Player[id][timestamp] : 0;
