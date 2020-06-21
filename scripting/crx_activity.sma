@@ -1,8 +1,14 @@
+// https://github.com/CrXane/PlayerActivity
+
 #include <amxmodx>
 #include <amxmisc>
 #include <nvault>
+#include <nvault_util>
+
+#define MAXIMUM_SEARCH 500
 
 new vault_name[] = "activity";
+new iCount;
 
 enum _:PlayerData{
 	steamid[32],
@@ -15,9 +21,9 @@ enum _:PlayerData{
 new Player[33][PlayerData];
 
 public plugin_init(){
-	register_plugin("Player Activity", "1.1", "Relaxing");
+	register_plugin("Player Activity", "2.0", "Relaxing");
 
-	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A, " - shows current players' activity, [steamid] for single search");
+	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A, " - shows current players' activity, [steamid] for search");
 	register_clcmd("say /activity", "clcmd_activity");
 }
 
@@ -48,18 +54,47 @@ public clcmd_admin_activity(id, level, cid){
 	new args[32];
 	read_args(args, charsmax(args));
 	remove_quotes(args); trim(args);
+	count_entries();
 	
 	if (strlen(args)){
 		new vault = nvault_open(vault_name);
-		new vault_data[10], _time[24], temp;
+		new vault_data[16], _time[24], temp;
 		
 		if (nvault_lookup(vault, args, vault_data, charsmax(vault_data), temp)){
 			format_time(_time, charsmax(_time), "%m/%d/%Y %H:%M:%S", temp);
 			console_print(id, "%s    %s", args, CalculateTime(str_to_num(vault_data)));
-			console_print(id, "Last online %s", _time)
-		} else console_print(id, "No data matching ^"%s^"", args);
+			console_print(id, " Last online %s", _time)
+		} else {
+			console_print(id, "No data matching ^"%s^"", args);
+			
+			new vault, iVault, iNextOffset, count, ssteamid[32], temp;
+			vault = nvault_open(vault_name);
+			iVault = nvault_util_open(vault_name);
+			for (new i = 0; i < iCount; i++){
+				iNextOffset = nvault_util_read_array(iVault, iNextOffset, ssteamid, charsmax(ssteamid), _time, charsmax(_time));
+				if (containi(ssteamid, args) != -1){
+					count++;
+					if (count == 1) console_print(id, "^nSearch results of ^"%s^"", args);
+					
+					if (count > MAXIMUM_SEARCH){
+						console_print(id, "Maximum search result is %d", MAXIMUM_SEARCH);
+						break;
+					}
+					
+					if (nvault_lookup(vault, ssteamid, vault_data, charsmax(vault_data), temp)){
+						format_time(_time, charsmax(_time), "%m/%d/%Y %H:%M:%S", temp);
+						console_print(id, "%d) %s  %s", count, ssteamid, CalculateTime(str_to_num(vault_data)));
+						console_print(id, " Last online %s", _time);
+					} else console_print(id, "Error retrieving information about %s", ssteamid);
+				}
+        		}
+        		nvault_util_close(iVault);
+        		nvault_close(vault);
+        		
+        		if (count) console_print(id, "^nFound %d results", count);
+		}
 	} else {	
-		new players[32], num, pid, name[32], x;
+		new players[32], num, pid, pname[32], x;
 		get_players(players, num, "ch");
 			
 		if (players[0]){
@@ -67,11 +102,11 @@ public clcmd_admin_activity(id, level, cid){
 			for (new i = 0; i < num; i++){
 				pid = players[i]; x++;
 				
-				get_user_name(pid, name, charsmax(name));
-				console_print(id, "%d) %s    %s", x, name, CalculateTime(Player[pid][iTotal_playtime]));
+				get_user_name(pid, pname, charsmax(pname));
+				console_print(id, "%d) %s    %s", x, pname, CalculateTime(Player[pid][iTotal_playtime]));
 			}
 		} else console_print(id, "No valid players online");
-	}
+	} console_print(id, "^nTotal entries: %d", iCount);
 	
 	return PLUGIN_HANDLED;
 }
@@ -113,6 +148,13 @@ stock SaveTime(id){
 	formatex(Player[id][total_playtime], charsmax(Player[][total_playtime]), "%d", Player[id][iTotal_playtime] + get_user_time(id)/60);
 	nvault_set(vault, Player[id][steamid], Player[id][total_playtime]);
 	nvault_close(vault);
+}
+
+stock count_entries(){
+	new iVault = nvault_util_open(vault_name);
+	iCount = nvault_util_count(iVault);
+	nvault_util_close(iVault);
+	return iCount;
 }
 
 public _get_user_time(id)
