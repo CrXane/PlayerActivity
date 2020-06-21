@@ -23,6 +23,7 @@ public plugin_init(){
 
 public plugin_natives(){
 	register_native("_get_user_time", "_get_user_time", 1);
+	register_native("_get_user_time_timestamp", "_get_user_time_timestamp", 1);
 }
 
 public client_putinserver(id){
