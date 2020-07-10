@@ -5,10 +5,8 @@
 #include <nvault>
 #include <nvault_util>
 
-#define MAXIMUM_SEARCH 500
-
 new vault_name[] = "activity";
-new iCount;
+new iCount, iCvar[2];
 
 enum _:PlayerData{
 	steamid[32],
@@ -25,6 +23,7 @@ public plugin_init(){
 
 	register_concmd("amx_activity", "clcmd_admin_activity", ADMIN_LEVEL_A, " - shows current players' activity, [steamid] for search");
 	register_clcmd("say /activity", "clcmd_activity");
+	iCvar[0] = register_cvar("activity_search_limit", "500");
 }
 
 public plugin_natives(){
@@ -70,13 +69,15 @@ public clcmd_admin_activity(id, level, cid){
 			new vault, iVault, iNextOffset, count, ssteamid[32], temp;
 			vault = nvault_open(vault_name);
 			iVault = nvault_util_open(vault_name);
+			iCvar[1] = get_pcvar_num(iCvar[0]);
+			
 			for (new i = 0; i < iCount; i++){
 				iNextOffset = nvault_util_read_array(iVault, iNextOffset, ssteamid, charsmax(ssteamid), _time, charsmax(_time));
 				if (containi(ssteamid, args) != -1){
 					count++;
 					if (count == 1) console_print(id, "^nSearch results of ^"%s^"", args);
 					
-					if (count > MAXIMUM_SEARCH){
+					if (count > iCvar[1] && iCvar[1] > 0){
 						console_print(id, "Maximum search result is %d", MAXIMUM_SEARCH);
 						break;
 					}
